@@ -1,16 +1,25 @@
 # Author : Tsukasa Matsuno
 # LastUpdate : 2016/11/14
-# link test
+
 # トップディレクトリ以下、全ソースファイルとヘッダーファイルを検索して、
 # 実行ファイルを生成する汎用makefile
 
 # ビルド対象となるTOPディレクトリを指定
 # 本ディレクトリ以下の全てのディレクトリとフォルダがビルド対象
-TOP_DIR=$(HOME)/document/compileexam/
+TOP_DIR=$(HOME)/document/C_Student
+# コンパイルに用いるアプリケーション
+# 例 : gcc, g++, cc, clang
+COMP_APP=gcc
+
 # コンパイルコマンド定義
-COMP_CMD=gcc -g -c
+COMP_OPT=-g -c
 # リンカーコマンド定義
-LINK_CMD=gcc -g
+LINK_OPT=-g -Wall -Wextra
+
+# flymake(リアルタイム コンパイルエラーチェック)オプション
+# flymake で検出する警告&エラーレベルを指定
+FLYMAKE_OPT=-Wall -Wextra
+#FLYMAKE_OPT=" "
 
 # TOP_DIRで指定したディレクトリ以下の存在するファイルをビルドするため、
 # 本makefileは任意の場所に配置して良い。
@@ -79,8 +88,9 @@ CUR_SRCS=$(shell find . -type f -name "*.c" 2> /dev/null )
 CUR_TSTS=$(CUR_SRCS:.c=)
 #-----------------------------------------------------------------
 # ビルドコマンド
-# コマンドの先頭に@を付けると画面にコマンドを出力しない
+# Hint : コマンドの先頭に@を付けると画面にコマンドを出力しない
 #-----------------------------------------------------------------
+.PHONY: all clean tags inc check-syntax
 
 all:$(MAIN_EXE)
 
@@ -90,21 +100,21 @@ all:$(MAIN_EXE)
 #-----------------------------------------------------------------
 # カレントディレクトリに含まれる(再帰的)全mainファイルをコンパイル＆リンク
 $(MAIN_EXE) : % : %.c $(LIB_OBJ)
-	@echo $(LINK_CMD) -MMD -MF demp.tmp -o $@  $<  $(LIB_OBJ) $(INC_OPT) >  linklog.txt
-	$(LINK_CMD) -MMD -MF demp.tmp -o $@ $<  $(LIB_OBJ) $(INC_OPT) | tee log.tmp
+	@echo $(COMP_APP) $(LINK_OPT) -MMD -MF demp.tmp -o $@  $<  $(LIB_OBJ) $(INC_OPT) >  linker.log
+	$(COMP_APP) $(LINK_OPT) -MMD -MF demp.tmp -o $@ $<  $(LIB_OBJ) $(INC_OPT) 2>&1 | tee build_result.log
 	@mv -f demp.tmp $(DEP_DIR)/$(notdir $(<:%.c=%.d))
-	@cat linklog.txt >> $(DEP_DIR)/$(notdir $@).log; cat log.tmp >> $(DEP_DIR)/$(notdir $@).log; 
-	@rm -fr linklog.txt log.tmp demp.tmp
+	@cat linker.log >> $(DEP_DIR)/$(notdir $@).log; cat build_result.log >> $(DEP_DIR)/$(notdir $@).log; 
+	@rm -fr linker.log build_result.log demp.tmp
 
 # 個別に実行ファイルを指定した場合のコンパイル＆リンク
 # 相対パスで指定した場合の関係を記載している
 $(CUR_TSTS) : % : %.c $(LIB_OBJ)
-	@echo $(LINK_CMD) -MMD -MF demp.tmp -o $@  $<  $(LIB_OBJ) $(INC_OPT) >  linklog.txt
-	$(LINK_CMD) -MMD -MF demp.tmp -o $@ $<  $(LIB_OBJ) $(INC_OPT) | tee log.tmp
+	@echo $(COMP_APP) $(LINK_OPT) -MMD -MF demp.tmp -o $@  $<  $(LIB_OBJ) $(INC_OPT) >  linker.log
+	$(COMP_APP) $(LINK_OPT) -MMD -MF demp.tmp -o $@ $<  $(LIB_OBJ) $(INC_OPT) 2>&1 | tee build_result.log
 	@sed "s!$@!$(PWD)/$@!g"  demp.tmp > $(<:%.c=%.d) 
 	@mv -f $(<:%.c=%.d)  $(DEP_DIR)
-	@cat linklog.txt >> $(DEP_DIR)/$(notdir $@).log; cat log.tmp >> $(DEP_DIR)/$(notdir $@).log; 
-	@rm -fr linklog.txt log.tmp demp.tmp
+	@cat linker.log >> $(DEP_DIR)/$(notdir $@).log; cat build_result.log >> $(DEP_DIR)/$(notdir $@).log; 
+	@rm -fr linker.log build_result.log demp.tmp
 
 #-----------------------------------------------------------------
 # コンパイルコマンド
@@ -113,10 +123,10 @@ $(CUR_TSTS) : % : %.c $(LIB_OBJ)
 # libファイルをコンパイルするコマンド
 # コンパイルによって生成したオブジェクトファイルはOBJディレクトリに格納する
 $(LIB_OBJ) : %.o : $(shell cat $(OUTFILE_ALL_C) | grep %.c )
-	@echo $(COMP_CMD) -o $@ -MMD -MF demp.tmp $(shell cat $(OUTFILE_ALL_C) | grep  $(notdir $(@:%.o=%.c))) $(INC_OPT) > complog.txt
-	$(COMP_CMD) -o $@ -MMD -MF demp.tmp $(shell cat $(OUTFILE_ALL_C) | grep  $(notdir $(@:%.o=%.c))) $(INC_OPT) 2>&1 | tee log.tmp
+	@echo $(COMP_APP) $(COMP_OPT) -c  -o $@ -MMD -MF demp.tmp $(shell cat $(OUTFILE_ALL_C) | grep  $(notdir $(@:%.o=%.c))) $(INC_OPT) > complog.txt
+	$(COMP_APP) $(COMP_OPT) -c -o $@ -MMD -MF demp.tmp $(shell cat $(OUTFILE_ALL_C) | grep  $(notdir $(@:%.o=%.c))) $(INC_OPT) 2>&1 | tee build_result.log
 	@mv -f demp.tmp $(DEP_DIR)/$(notdir $(@:%.o=%.d))
-	@cat log.tmp >> complog.txt; rm -fr log.tmp
+	@cat build_result.log >> complog.txt; rm -fr build_result.log
 	@mv -f complog.txt $(DEP_DIR)/$(notdir $(@:%.o=%.log))
 
 # ヘッダーファイルの依存関係ファイルを読み込む
@@ -141,3 +151,5 @@ tags :
 inc :
 	@echo $(INC_OPT)
 
+check-syntax :
+	$(COMP_APP) $(INC_OPT) $(FLYMAKE_OPT) -Wall -Wextra -fsyntax-only $(CHK_SOURCES)

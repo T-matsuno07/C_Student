@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "Student.h"
-
+/* main method */
 int main(int argc, char **argv){
   int localA = 0;
   Student a;
@@ -11,3 +11,4 @@ int main(int argc, char **argv){
   printf("Hello world!  %d \n", localA );
   return 0;
 }
+
